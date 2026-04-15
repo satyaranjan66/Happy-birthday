@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insta Story Editor</title>
+    <title>Insta Story Pro Editor</title>
     <style>
         :root { --ig-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
         body { font-family: -apple-system, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
@@ -19,17 +19,21 @@
 
         #main-video, #main-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
         
-        /* Clean Text Styles (No Background) */
         .draggable-text {
             position: absolute; color: #fff; font-weight: bold; z-index: 100; 
             cursor: move; text-shadow: 0px 2px 8px rgba(0,0,0,0.8); user-select: none;
+            white-space: nowrap;
         }
         
-        #drag-mention { top: 250px; left: 60px; font-size: 24px; }
-        #drag-custom { top: 320px; left: 60px; font-size: 20px; width: 80%; text-align: center; }
+        #drag-mention { top: 200px; left: 60px; font-size: 24px; }
+        #drag-custom { top: 300px; left: 40px; font-size: 20px; }
 
         .controls { margin-top: 15px; background: #222; padding: 15px; border-radius: 15px; width: 320px; box-sizing: border-box; }
-        input { width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; }
+        .control-group { margin-bottom: 12px; }
+        label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; }
+        input[type="text"], input[type="file"], select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; }
+        input[type="range"] { width: 100%; accent-color: #f09433; }
+        
         .btn { background: var(--ig-gradient); color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         #status { font-size: 12px; color: #00ffcc; text-align: center; margin-top: 10px; }
     </style>
@@ -46,20 +50,39 @@
         </div>
 
         <div class="draggable-text" id="drag-mention">@<span id="mention-display">mention_id</span></div>
-        
-        <div class="draggable-text" id="drag-custom"><span id="custom-display">Write something here...</span></div>
+        <div class="draggable-text" id="drag-custom"><span id="custom-display">Story Text Here</span></div>
     </div>
 
     <div class="controls">
-        <input type="text" id="user-in" placeholder="Edit Your Name" oninput="sync()">
-        <input type="text" id="mention-in" placeholder="Mention @..." oninput="sync()">
-        <input type="text" id="custom-in" placeholder="Type Story Text..." oninput="sync()">
-        
-        <input type="file" accept="image/*" onchange="loadDP(event)">
+        <div class="control-group">
+            <input type="text" id="user-in" placeholder="User Name" oninput="sync()">
+            <input type="text" id="mention-in" placeholder="Mention @..." oninput="sync()">
+            <input type="text" id="custom-in" placeholder="Custom Text..." oninput="sync()">
+        </div>
+
+        <div class="control-group">
+            <label>Mention Size</label>
+            <input type="range" id="mention-size" min="15" max="50" value="24" oninput="sync()">
+            <label>Text Size</label>
+            <input type="range" id="custom-size" min="15" max="50" value="20" oninput="sync()">
+        </div>
+
+        <div class="control-group">
+            <label>Download Duration (Seconds)</label>
+            <select id="record-time">
+                <option value="5000">5 Seconds</option>
+                <option value="10000">10 Seconds</option>
+                <option value="15000">15 Seconds</option>
+                <option value="30000">30 Seconds</option>
+                <option value="60000">60 Seconds (1 Min)</option>
+            </select>
+        </div>
+
+        <input type="file" accept="image/*" onchange="loadDP(event)" style="margin-bottom: 5px;">
         <input type="file" accept="image/*,video/*" onchange="loadMedia(event)">
         
-        <button class="btn" onclick="recordVideo()">Download Video (5s)</button>
-        <p id="status">Ready to create...</p>
+        <button class="btn" onclick="recordVideo()">Download Video</button>
+        <p id="status">Ready...</p>
     </div>
 
     <canvas id="recorder-canvas" width="320" height="560" style="display:none;"></canvas>
@@ -75,7 +98,11 @@
         function sync() {
             document.getElementById('user-display').innerText = document.getElementById('user-in').value || "Your_Name";
             document.getElementById('mention-display').innerText = document.getElementById('mention-in').value || "mention_id";
-            document.getElementById('custom-display').innerText = document.getElementById('custom-in').value || "Write something here...";
+            document.getElementById('custom-display').innerText = document.getElementById('custom-in').value || "Story Text Here";
+            
+            // UI Size Update
+            document.getElementById('drag-mention').style.fontSize = document.getElementById('mention-size').value + 'px';
+            document.getElementById('drag-custom').style.fontSize = document.getElementById('custom-size').value + 'px';
         }
 
         function loadDP(e) { 
@@ -98,6 +125,7 @@
 
         async function recordVideo() {
             const status = document.getElementById('status');
+            const duration = parseInt(document.getElementById('record-time').value);
             const stream = canvas.captureStream(30);
             const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
             const chunks = [];
@@ -116,41 +144,39 @@
                 if(isVideoMode) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 else ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
-                // 1. Draw Header
+                // Draw Header
                 ctx.save();
                 ctx.beginPath(); ctx.arc(30, 32, 17, 0, Math.PI * 2); ctx.clip();
                 ctx.drawImage(dpImg, 13, 15, 34, 34);
                 ctx.restore();
-                
                 ctx.fillStyle = "white";
                 ctx.font = "bold 14px Arial";
                 ctx.fillText(document.getElementById('user-display').innerText, 55, 37);
 
-                // 2. Draw Mention Text (No Background)
+                // Draw Mention (with dynamic size)
                 const mSticker = document.getElementById('drag-mention');
                 const mRect = mSticker.getBoundingClientRect();
+                const mSize = document.getElementById('mention-size').value;
                 const boxRect = document.getElementById('capture-area').getBoundingClientRect();
-                
-                ctx.font = "bold 24px Arial";
-                ctx.fillText("@" + document.getElementById('mention-display').innerText, mRect.left - boxRect.left, (mRect.top - boxRect.top) + 24);
+                ctx.font = `bold ${mSize}px Arial`;
+                ctx.fillText("@" + document.getElementById('mention-display').innerText, mRect.left - boxRect.left, (mRect.top - boxRect.top) + parseInt(mSize));
 
-                // 3. Draw Custom Text
+                // Draw Custom Text (with dynamic size)
                 const cSticker = document.getElementById('drag-custom');
                 const cRect = cSticker.getBoundingClientRect();
-                
-                ctx.font = "bold 20px Arial";
-                ctx.fillText(document.getElementById('custom-display').innerText, cRect.left - boxRect.left, (cRect.top - boxRect.top) + 20);
+                const cSize = document.getElementById('custom-size').value;
+                ctx.font = `bold ${cSize}px Arial`;
+                ctx.fillText(document.getElementById('custom-display').innerText, cRect.left - boxRect.left, (cRect.top - boxRect.top) + parseInt(cSize));
                 
                 if(recorder.state === 'recording') requestAnimationFrame(drawLoop);
             };
 
             recorder.start();
             drawLoop();
-            status.innerText = "Recording Video...";
-            setTimeout(() => recorder.stop(), 5000);
+            status.innerText = `Recording for ${duration/1000} seconds...`;
+            setTimeout(() => recorder.stop(), duration);
         }
 
-        // Universal Drag Logic for multiple elements
         function makeDraggable(el) {
             const box = document.getElementById('capture-area');
             const move = (e) => {
