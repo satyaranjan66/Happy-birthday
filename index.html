@@ -3,155 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insta Story Video Downloader</title>
+    <title>Insta Story Fixed</title>
     <style>
         :root { --ig-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-        body { font-family: -apple-system, sans-serif; background: #000; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
+        body { font-family: -apple-system, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; }
         
         /* Story Box */
-        .story-container {
-            width: 320px; height: 560px; background: #111; border-radius: 15px;
+        #capture-area {
+            width: 320px; height: 560px; background: #000; border-radius: 15px;
             position: relative; overflow: hidden; border: 2px solid #333;
         }
 
-        .header {
-            position: absolute; top: 12px; left: 12px; display: flex;
-            align-items: center; gap: 8px; z-index: 20;
-        }
-
+        .header { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; z-index: 20; }
         .dp { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #fff; object-fit: cover; }
-
-        #main-media { width: 100%; height: 100%; object-fit: cover; }
-
+        #main-video, #main-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
+        
         .sticker {
             position: absolute; top: 200px; left: 60px; background: white;
             color: #d62976; padding: 8px 15px; border-radius: 10px;
             font-weight: bold; font-size: 22px; z-index: 100; cursor: move;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4); user-select: none;
         }
 
-        /* Controls */
-        .controls {
-            margin-top: 15px; background: #222; padding: 15px; border-radius: 15px;
-            width: 320px; box-sizing: border-box;
-        }
-
-        input, select { width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #444; background: #333; color: white; }
-        
-        .btn {
-            background: var(--ig-gradient); color: white; border: none; width: 100%;
-            padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px;
-        }
-
+        .controls { margin-top: 15px; background: #222; padding: 15px; border-radius: 15px; width: 320px; box-sizing: border-box; }
+        input { width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; }
+        .btn { background: var(--ig-gradient); color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         #status { font-size: 12px; color: #00ffcc; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <div class="story-container" id="capture-area">
+    <div id="capture-area">
+        <video id="main-video" loop playsinline crossorigin="anonymous" style="display:none;"></video>
+        <img id="main-img" src="https://via.placeholder.com/1080x1920" style="display:block;">
+        
         <div class="header">
             <img src="https://via.placeholder.com/50" class="dp" id="dp-preview">
             <span id="user-display" style="font-weight:600; font-size:14px; text-shadow: 1px 1px 3px #000;">User_Name</span>
         </div>
 
-        <div id="media-holder" style="width:100%; height:100%;">
-            <img src="https://via.placeholder.com/1080x1920" id="main-media">
-        </div>
-
-        <div class="sticker" id="drag-sticker">
-            @<span id="mention-display">mention_id</span>
-        </div>
+        <div class="sticker" id="drag-sticker">@<span id="mention-display">mention_id</span></div>
     </div>
 
     <div class="controls">
         <input type="text" id="user-in" placeholder="Edit Your Name" oninput="sync()">
-        <input type="text" id="mention-in" placeholder="Mention Someone" oninput="sync()">
-        
-        <label style="font-size:11px; color:#888;">Profile Picture</label>
+        <input type="text" id="mention-in" placeholder="Mention @..." oninput="sync()">
         <input type="file" accept="image/*" onchange="loadDP(event)">
-        
-        <label style="font-size:11px; color:#888;">Main Video/Image</label>
         <input type="file" accept="image/*,video/*" onchange="loadMedia(event)">
-
-        <button class="btn" onclick="startDownload()">Download Story Video</button>
-        <p id="status">Ready to edit...</p>
+        <button class="btn" onclick="recordVideo()">Download Video (5s)</button>
+        <p id="status">Ready...</p>
     </div>
 
+    <canvas id="recorder-canvas" width="320" height="560" style="display:none;"></canvas>
+
     <script>
-        let mediaStream = null;
+        const video = document.getElementById('main-video');
+        const img = document.getElementById('main-img');
+        const canvas = document.getElementById('recorder-canvas');
+        const ctx = canvas.getContext('2d');
+        let isVideoMode = false;
 
         function sync() {
             document.getElementById('user-display').innerText = document.getElementById('user-in').value || "User_Name";
             document.getElementById('mention-display').innerText = document.getElementById('mention-in').value || "mention_id";
         }
 
-        function loadDP(e) {
-            document.getElementById('dp-preview').src = URL.createObjectURL(e.target.files[0]);
-        }
+        function loadDP(e) { document.getElementById('dp-preview').src = URL.createObjectURL(e.target.files[0]); }
 
         function loadMedia(e) {
             const file = e.target.files[0];
-            const holder = document.getElementById('media-holder');
-            holder.innerHTML = "";
-            
-            const isVideo = file.type.includes('video');
-            const el = document.createElement(isVideo ? 'video' : 'img');
-            el.id = "main-media";
-            el.src = URL.createObjectURL(file);
-            
-            if(isVideo) {
-                el.autoplay = true; el.loop = true; el.muted = false; el.playsInline = true;
-                el.onclick = () => el.play(); // Click to play fix
+            const url = URL.createObjectURL(file);
+            if(file.type.includes('video')) {
+                video.src = url; video.style.display = "block"; img.style.display = "none";
+                video.play(); video.muted = false; isVideoMode = true;
+            } else {
+                img.src = url; img.style.display = "block"; video.style.display = "none";
+                isVideoMode = false;
             }
-            holder.appendChild(el);
-            document.getElementById('status').innerText = "Media loaded. Click video to play sound.";
         }
 
-        async function startDownload() {
+        async function recordVideo() {
             const status = document.getElementById('status');
-            const area = document.getElementById('capture-area');
-            
-            if (!area.captureStream) {
-                alert("Aapka browser video download support nahi karta. Please Google Chrome use karein.");
-                return;
-            }
+            const stream = canvas.captureStream(30);
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const chunks = [];
 
-            status.innerText = "Processing... Video 5 seconds mein download hogi.";
-            
-            const stream = area.captureStream(30);
-            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-            const data = [];
-
-            recorder.ondataavailable = (e) => data.push(e.data);
+            recorder.ondataavailable = e => chunks.push(e.data);
             recorder.onstop = () => {
-                const blob = new Blob(data, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
+                const blob = new Blob(chunks, { type: 'video/webm' });
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = 'insta_story_video.webm';
+                a.href = URL.createObjectURL(blob);
+                a.download = 'story.webm';
                 a.click();
-                status.innerText = "Download Successful!";
+                status.innerText = "Downloaded!";
+            };
+
+            // Canvas drawing loop
+            const draw = () => {
+                if(isVideoMode) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                else ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Draw Overlay UI on Canvas
+                ctx.fillStyle = "white";
+                ctx.font = "bold 20px Arial";
+                const sticker = document.getElementById('drag-sticker');
+                const rect = document.getElementById('capture-area').getBoundingClientRect();
+                const sRect = sticker.getBoundingClientRect();
+                
+                // Draw Sticker
+                ctx.fillRect(sRect.left - rect.left, sRect.top - rect.top, sRect.width, sRect.height);
+                ctx.fillStyle = "#d62976";
+                ctx.fillText("@" + document.getElementById('mention-display').innerText, (sRect.left - rect.left) + 10, (sRect.top - rect.top) + 25);
+                
+                if(recorder.state === 'recording') requestAnimationFrame(draw);
             };
 
             recorder.start();
-            setTimeout(() => recorder.stop(), 5000); // 5 second ki recording
+            draw();
+            status.innerText = "Recording...";
+            setTimeout(() => recorder.stop(), 5000);
         }
 
-        // Simple Drag Logic
+        // Drag Logic (Same as before)
         const sticker = document.getElementById('drag-sticker');
         const box = document.getElementById('capture-area');
-        
-        function move(e) {
+        const move = (e) => {
             let cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             let cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
             let r = box.getBoundingClientRect();
             sticker.style.left = (cx - r.left - 50) + 'px';
             sticker.style.top = (cy - r.top - 20) + 'px';
-        }
-
-        sticker.addEventListener('mousedown', () => document.addEventListener('mousemove', move));
+        };
         sticker.addEventListener('touchstart', () => document.addEventListener('touchmove', move, {passive:false}));
-        document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move));
         document.addEventListener('touchend', () => document.removeEventListener('touchmove', move));
     </script>
 </body>
