@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insta Story Final Fix</title>
+    <title>Insta Story Editor</title>
     <style>
         :root { --ig-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-        body { font-family: -apple-system, sans-serif; background: #000; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
+        body { font-family: -apple-system, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
         
         #capture-area {
-            width: 320px; height: 560px; background: #111; border-radius: 15px;
+            width: 320px; height: 560px; background: #000; border-radius: 15px;
             position: relative; overflow: hidden; border: 2px solid #333;
         }
 
@@ -19,15 +19,14 @@
 
         #main-video, #main-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
         
-        /* Modern Simple Mention Style */
-        .sticker {
-            position: absolute; top: 250px; left: 60px; 
-            color: #fff; padding: 6px 12px; border-radius: 20px;
-            font-weight: bold; font-size: 24px; z-index: 100; cursor: move;
-            text-shadow: 0px 2px 10px rgba(0,0,0,0.5);
-            background: rgba(255, 255, 255, 0.2); /* Semi-transparent like Insta */
-            backdrop-filter: blur(5px);
+        /* Clean Text Styles (No Background) */
+        .draggable-text {
+            position: absolute; color: #fff; font-weight: bold; z-index: 100; 
+            cursor: move; text-shadow: 0px 2px 8px rgba(0,0,0,0.8); user-select: none;
         }
+        
+        #drag-mention { top: 250px; left: 60px; font-size: 24px; }
+        #drag-custom { top: 320px; left: 60px; font-size: 20px; width: 80%; text-align: center; }
 
         .controls { margin-top: 15px; background: #222; padding: 15px; border-radius: 15px; width: 320px; box-sizing: border-box; }
         input { width: 100%; padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; }
@@ -41,21 +40,26 @@
         <video id="main-video" loop playsinline crossorigin="anonymous" style="display:none;"></video>
         <img id="main-img" src="https://via.placeholder.com/1080x1920" style="display:block;">
         
-        <div class="header" id="story-header">
+        <div class="header">
             <img src="https://via.placeholder.com/50" class="dp" id="dp-preview">
             <span id="user-display">Your_Name</span>
         </div>
 
-        <div class="sticker" id="drag-sticker">@<span id="mention-display">mention_id</span></div>
+        <div class="draggable-text" id="drag-mention">@<span id="mention-display">mention_id</span></div>
+        
+        <div class="draggable-text" id="drag-custom"><span id="custom-display">Write something here...</span></div>
     </div>
 
     <div class="controls">
-        <input type="text" id="user-in" placeholder="Your Username" oninput="sync()">
+        <input type="text" id="user-in" placeholder="Edit Your Name" oninput="sync()">
         <input type="text" id="mention-in" placeholder="Mention @..." oninput="sync()">
-        <input type="file" id="dp-input" accept="image/*" onchange="loadDP(event)">
-        <input type="file" id="media-input" accept="image/*,video/*" onchange="loadMedia(event)">
+        <input type="text" id="custom-in" placeholder="Type Story Text..." oninput="sync()">
+        
+        <input type="file" accept="image/*" onchange="loadDP(event)">
+        <input type="file" accept="image/*,video/*" onchange="loadMedia(event)">
+        
         <button class="btn" onclick="recordVideo()">Download Video (5s)</button>
-        <p id="status">Ready...</p>
+        <p id="status">Ready to create...</p>
     </div>
 
     <canvas id="recorder-canvas" width="320" height="560" style="display:none;"></canvas>
@@ -71,6 +75,7 @@
         function sync() {
             document.getElementById('user-display').innerText = document.getElementById('user-in').value || "Your_Name";
             document.getElementById('mention-display').innerText = document.getElementById('mention-in').value || "mention_id";
+            document.getElementById('custom-display').innerText = document.getElementById('custom-in').value || "Write something here...";
         }
 
         function loadDP(e) { 
@@ -108,17 +113,12 @@
             };
 
             const drawLoop = () => {
-                // 1. Draw Background (Video or Image)
                 if(isVideoMode) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 else ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
-                // 2. Draw Header (DP and Username)
+                // 1. Draw Header
                 ctx.save();
-                // Draw DP (Circle)
-                ctx.beginPath();
-                ctx.arc(30, 32, 17, 0, Math.PI * 2);
-                ctx.closePath();
-                ctx.clip();
+                ctx.beginPath(); ctx.arc(30, 32, 17, 0, Math.PI * 2); ctx.clip();
                 ctx.drawImage(dpImg, 13, 15, 34, 34);
                 ctx.restore();
                 
@@ -126,22 +126,20 @@
                 ctx.font = "bold 14px Arial";
                 ctx.fillText(document.getElementById('user-display').innerText, 55, 37);
 
-                // 3. Draw Mention Sticker (Clean Style)
-                const sticker = document.getElementById('drag-sticker');
+                // 2. Draw Mention Text (No Background)
+                const mSticker = document.getElementById('drag-mention');
+                const mRect = mSticker.getBoundingClientRect();
                 const boxRect = document.getElementById('capture-area').getBoundingClientRect();
-                const sRect = sticker.getBoundingClientRect();
-                const x = sRect.left - boxRect.left;
-                const y = sRect.top - boxRect.top;
+                
+                ctx.font = "bold 24px Arial";
+                ctx.fillText("@" + document.getElementById('mention-display').innerText, mRect.left - boxRect.left, (mRect.top - boxRect.top) + 24);
 
-                // Simple Transparent Pill
-                ctx.fillStyle = "rgba(255,255,255,0.2)";
-                ctx.beginPath();
-                ctx.roundRect(x, y, sRect.width, sRect.height, 20);
-                ctx.fill();
-
-                ctx.fillStyle = "white";
-                ctx.font = "bold 22px Arial";
-                ctx.fillText("@" + document.getElementById('mention-display').innerText, x + 12, y + 30);
+                // 3. Draw Custom Text
+                const cSticker = document.getElementById('drag-custom');
+                const cRect = cSticker.getBoundingClientRect();
+                
+                ctx.font = "bold 20px Arial";
+                ctx.fillText(document.getElementById('custom-display').innerText, cRect.left - boxRect.left, (cRect.top - boxRect.top) + 20);
                 
                 if(recorder.state === 'recording') requestAnimationFrame(drawLoop);
             };
@@ -152,23 +150,25 @@
             setTimeout(() => recorder.stop(), 5000);
         }
 
-        // Drag Logic
-        const sticker = document.getElementById('drag-sticker');
-        const box = document.getElementById('capture-area');
-        const move = (e) => {
-            e.preventDefault();
-            let cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-            let cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-            let r = box.getBoundingClientRect();
-            sticker.style.left = (cx - r.left - (sticker.offsetWidth/2)) + 'px';
-            sticker.style.top = (cy - r.top - (sticker.offsetHeight/2)) + 'px';
-        };
-        sticker.addEventListener('touchstart', (e) => {
-            document.addEventListener('touchmove', move, {passive:false});
-        });
-        document.addEventListener('touchend', () => {
-            document.removeEventListener('touchmove', move);
-        });
+        // Universal Drag Logic for multiple elements
+        function makeDraggable(el) {
+            const box = document.getElementById('capture-area');
+            const move = (e) => {
+                e.preventDefault();
+                let cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                let cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                let r = box.getBoundingClientRect();
+                el.style.left = (cx - r.left - (el.offsetWidth/2)) + 'px';
+                el.style.top = (cy - r.top - (el.offsetHeight/2)) + 'px';
+            };
+            el.addEventListener('touchstart', () => document.addEventListener('touchmove', move, {passive:false}));
+            document.addEventListener('touchend', () => document.removeEventListener('touchmove', move));
+            el.addEventListener('mousedown', () => document.addEventListener('mousemove', move));
+            document.addEventListener('mouseup', () => document.removeEventListener('mousemove', move));
+        }
+
+        makeDraggable(document.getElementById('drag-mention'));
+        makeDraggable(document.getElementById('drag-custom'));
     </script>
 </body>
 </html>
