@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insta Story Pro Editor</title>
+    <title>Insta Story Pro Editor </title>
     <style>
         :root { --ig-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
         body { font-family: -apple-system, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
@@ -11,13 +11,16 @@
         #capture-area {
             width: 320px; height: 560px; background: #000; border-radius: 15px;
             position: relative; overflow: hidden; border: 2px solid #333;
+            display: flex; align-items: center; justify-content: center;
         }
 
         .header { position: absolute; top: 15px; left: 12px; display: flex; align-items: center; gap: 10px; z-index: 100; }
         .dp { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #fff; object-fit: cover; }
         #user-display { font-weight: 700; font-size: 14px; text-shadow: 1px 1px 4px rgba(0,0,0,0.8); }
 
-        #main-video, #main-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
+        /* Media styling with dynamic scale */
+        #media-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: absolute; }
+        #main-video, #main-img { max-width: none; transition: transform 0.1s; }
         
         .draggable-text {
             position: absolute; color: #fff; font-weight: bold; z-index: 100; 
@@ -30,9 +33,9 @@
 
         .controls { margin-top: 15px; background: #222; padding: 15px; border-radius: 15px; width: 320px; box-sizing: border-box; }
         .control-group { margin-bottom: 12px; }
-        label { display: block; font-size: 11px; color: #888; margin-bottom: 4px; }
-        input[type="text"], input[type="file"], select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; }
-        input[type="range"] { width: 100%; accent-color: #f09433; }
+        label { display: block; font-size: 11px; color: #aaa; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        input[type="text"], input[type="file"], select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #444; background: #333; color: white; box-sizing: border-box; margin-bottom: 5px; }
+        input[type="range"] { width: 100%; accent-color: #e6683c; cursor: pointer; }
         
         .btn { background: var(--ig-gradient); color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         #status { font-size: 12px; color: #00ffcc; text-align: center; margin-top: 10px; }
@@ -41,8 +44,10 @@
 <body>
 
     <div id="capture-area">
-        <video id="main-video" loop playsinline crossorigin="anonymous" style="display:none;"></video>
-        <img id="main-img" src="https://via.placeholder.com/1080x1920" style="display:block;">
+        <div id="media-container">
+            <video id="main-video" loop playsinline crossorigin="anonymous" style="display:none;"></video>
+            <img id="main-img" src="https://via.placeholder.com/1080x1920" style="display:block;">
+        </div>
         
         <div class="header">
             <img src="https://via.placeholder.com/50" class="dp" id="dp-preview">
@@ -61,14 +66,18 @@
         </div>
 
         <div class="control-group">
-            <label>Mention Size</label>
-            <input type="range" id="mention-size" min="15" max="50" value="24" oninput="sync()">
-            <label>Text Size</label>
-            <input type="range" id="custom-size" min="15" max="50" value="20" oninput="sync()">
+            <label>Media Size (Zoom) <span id="val-media">100%</span></label>
+            <input type="range" id="media-size" min="20" max="250" value="100" oninput="sync()">
+            
+            <label>Mention Size <span id="val-mention">24px</span></label>
+            <input type="range" id="mention-size" min="10" max="80" value="24" oninput="sync()">
+            
+            <label>Text Size <span id="val-custom">20px</span></label>
+            <input type="range" id="custom-size" min="10" max="80" value="20" oninput="sync()">
         </div>
 
         <div class="control-group">
-            <label>Download Duration (Seconds)</label>
+            <label>Download Duration</label>
             <select id="record-time">
                 <option value="5000">5 Seconds</option>
                 <option value="10000">10 Seconds</option>
@@ -78,7 +87,8 @@
             </select>
         </div>
 
-        <input type="file" accept="image/*" onchange="loadDP(event)" style="margin-bottom: 5px;">
+        <label>Files</label>
+        <input type="file" accept="image/*" onchange="loadDP(event)">
         <input type="file" accept="image/*,video/*" onchange="loadMedia(event)">
         
         <button class="btn" onclick="recordVideo()">Download Video</button>
@@ -100,9 +110,20 @@
             document.getElementById('mention-display').innerText = document.getElementById('mention-in').value || "mention_id";
             document.getElementById('custom-display').innerText = document.getElementById('custom-in').value || "Story Text Here";
             
-            // UI Size Update
-            document.getElementById('drag-mention').style.fontSize = document.getElementById('mention-size').value + 'px';
-            document.getElementById('drag-custom').style.fontSize = document.getElementById('custom-size').value + 'px';
+            // Sizes
+            const mSize = document.getElementById('mention-size').value;
+            const cSize = document.getElementById('custom-size').value;
+            const mediaScale = document.getElementById('media-size').value / 100;
+
+            document.getElementById('drag-mention').style.fontSize = mSize + 'px';
+            document.getElementById('drag-custom').style.fontSize = cSize + 'px';
+            document.getElementById('main-video').style.transform = `scale(${mediaScale})`;
+            document.getElementById('main-img').style.transform = `scale(${mediaScale})`;
+
+            // Labels update
+            document.getElementById('val-media').innerText = Math.round(mediaScale * 100) + '%';
+            document.getElementById('val-mention').innerText = mSize + 'px';
+            document.getElementById('val-custom').innerText = cSize + 'px';
         }
 
         function loadDP(e) { 
@@ -141,8 +162,19 @@
             };
 
             const drawLoop = () => {
-                if(isVideoMode) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                else ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const mediaScale = document.getElementById('media-size').value / 100;
+                
+                // Clear background
+                ctx.fillStyle = "black";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw Background Media with Scale
+                const currentMedia = isVideoMode ? video : img;
+                const sw = canvas.width * mediaScale;
+                const sh = canvas.height * mediaScale;
+                const sx = (canvas.width - sw) / 2;
+                const sy = (canvas.height - sh) / 2;
+                ctx.drawImage(currentMedia, sx, sy, sw, sh);
                 
                 // Draw Header
                 ctx.save();
@@ -153,27 +185,28 @@
                 ctx.font = "bold 14px Arial";
                 ctx.fillText(document.getElementById('user-display').innerText, 55, 37);
 
-                // Draw Mention (with dynamic size)
+                const boxRect = document.getElementById('capture-area').getBoundingClientRect();
+
+                // Draw Mention
                 const mSticker = document.getElementById('drag-mention');
                 const mRect = mSticker.getBoundingClientRect();
                 const mSize = document.getElementById('mention-size').value;
-                const boxRect = document.getElementById('capture-area').getBoundingClientRect();
                 ctx.font = `bold ${mSize}px Arial`;
-                ctx.fillText("@" + document.getElementById('mention-display').innerText, mRect.left - boxRect.left, (mRect.top - boxRect.top) + parseInt(mSize));
+                ctx.fillText("@" + document.getElementById('mention-display').innerText, mRect.left - boxRect.left, (mRect.top - boxRect.top) + parseInt(mSize) * 0.8);
 
-                // Draw Custom Text (with dynamic size)
+                // Draw Custom Text
                 const cSticker = document.getElementById('drag-custom');
                 const cRect = cSticker.getBoundingClientRect();
                 const cSize = document.getElementById('custom-size').value;
                 ctx.font = `bold ${cSize}px Arial`;
-                ctx.fillText(document.getElementById('custom-display').innerText, cRect.left - boxRect.left, (cRect.top - boxRect.top) + parseInt(cSize));
+                ctx.fillText(document.getElementById('custom-display').innerText, cRect.left - boxRect.left, (cRect.top - boxRect.top) + parseInt(cSize) * 0.8);
                 
                 if(recorder.state === 'recording') requestAnimationFrame(drawLoop);
             };
 
             recorder.start();
             drawLoop();
-            status.innerText = `Recording for ${duration/1000} seconds...`;
+            status.innerText = `Recording ${duration/1000}s...`;
             setTimeout(() => recorder.stop(), duration);
         }
 
