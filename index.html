@@ -3,25 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insta Story Fixed</title>
+    <title>Insta Story Final Fix</title>
     <style>
         :root { --ig-gradient: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-        body { font-family: -apple-system, sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        body { font-family: -apple-system, sans-serif; background: #000; color: white; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
         
-        /* Story Box */
         #capture-area {
-            width: 320px; height: 560px; background: #000; border-radius: 15px;
+            width: 320px; height: 560px; background: #111; border-radius: 15px;
             position: relative; overflow: hidden; border: 2px solid #333;
         }
 
-        .header { position: absolute; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; z-index: 20; }
-        .dp { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #fff; object-fit: cover; }
+        .header { position: absolute; top: 15px; left: 12px; display: flex; align-items: center; gap: 10px; z-index: 100; }
+        .dp { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #fff; object-fit: cover; }
+        #user-display { font-weight: 700; font-size: 14px; text-shadow: 1px 1px 4px rgba(0,0,0,0.8); }
+
         #main-video, #main-img { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
         
+        /* Modern Simple Mention Style */
         .sticker {
-            position: absolute; top: 200px; left: 60px; background: white;
-            color: #d62976; padding: 8px 15px; border-radius: 10px;
-            font-weight: bold; font-size: 22px; z-index: 100; cursor: move;
+            position: absolute; top: 250px; left: 60px; 
+            color: #fff; padding: 6px 12px; border-radius: 20px;
+            font-weight: bold; font-size: 24px; z-index: 100; cursor: move;
+            text-shadow: 0px 2px 10px rgba(0,0,0,0.5);
+            background: rgba(255, 255, 255, 0.2); /* Semi-transparent like Insta */
+            backdrop-filter: blur(5px);
         }
 
         .controls { margin-top: 15px; background: #222; padding: 15px; border-radius: 15px; width: 320px; box-sizing: border-box; }
@@ -36,19 +41,19 @@
         <video id="main-video" loop playsinline crossorigin="anonymous" style="display:none;"></video>
         <img id="main-img" src="https://via.placeholder.com/1080x1920" style="display:block;">
         
-        <div class="header">
+        <div class="header" id="story-header">
             <img src="https://via.placeholder.com/50" class="dp" id="dp-preview">
-            <span id="user-display" style="font-weight:600; font-size:14px; text-shadow: 1px 1px 3px #000;">User_Name</span>
+            <span id="user-display">Your_Name</span>
         </div>
 
         <div class="sticker" id="drag-sticker">@<span id="mention-display">mention_id</span></div>
     </div>
 
     <div class="controls">
-        <input type="text" id="user-in" placeholder="Edit Your Name" oninput="sync()">
+        <input type="text" id="user-in" placeholder="Your Username" oninput="sync()">
         <input type="text" id="mention-in" placeholder="Mention @..." oninput="sync()">
-        <input type="file" accept="image/*" onchange="loadDP(event)">
-        <input type="file" accept="image/*,video/*" onchange="loadMedia(event)">
+        <input type="file" id="dp-input" accept="image/*" onchange="loadDP(event)">
+        <input type="file" id="media-input" accept="image/*,video/*" onchange="loadMedia(event)">
         <button class="btn" onclick="recordVideo()">Download Video (5s)</button>
         <p id="status">Ready...</p>
     </div>
@@ -60,21 +65,26 @@
         const img = document.getElementById('main-img');
         const canvas = document.getElementById('recorder-canvas');
         const ctx = canvas.getContext('2d');
+        const dpImg = document.getElementById('dp-preview');
         let isVideoMode = false;
 
         function sync() {
-            document.getElementById('user-display').innerText = document.getElementById('user-in').value || "User_Name";
+            document.getElementById('user-display').innerText = document.getElementById('user-in').value || "Your_Name";
             document.getElementById('mention-display').innerText = document.getElementById('mention-in').value || "mention_id";
         }
 
-        function loadDP(e) { document.getElementById('dp-preview').src = URL.createObjectURL(e.target.files[0]); }
+        function loadDP(e) { 
+            const reader = new FileReader();
+            reader.onload = (event) => dpImg.src = event.target.result;
+            reader.readAsDataURL(e.target.files[0]);
+        }
 
         function loadMedia(e) {
             const file = e.target.files[0];
             const url = URL.createObjectURL(file);
             if(file.type.includes('video')) {
                 video.src = url; video.style.display = "block"; img.style.display = "none";
-                video.play(); video.muted = false; isVideoMode = true;
+                video.play(); isVideoMode = true;
             } else {
                 img.src = url; img.style.display = "block"; video.style.display = "none";
                 isVideoMode = false;
@@ -92,49 +102,73 @@
                 const blob = new Blob(chunks, { type: 'video/webm' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'story.webm';
+                a.download = 'insta_story.webm';
                 a.click();
                 status.innerText = "Downloaded!";
             };
 
-            // Canvas drawing loop
-            const draw = () => {
+            const drawLoop = () => {
+                // 1. Draw Background (Video or Image)
                 if(isVideoMode) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 else ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
-                // Draw Overlay UI on Canvas
+                // 2. Draw Header (DP and Username)
+                ctx.save();
+                // Draw DP (Circle)
+                ctx.beginPath();
+                ctx.arc(30, 32, 17, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(dpImg, 13, 15, 34, 34);
+                ctx.restore();
+                
                 ctx.fillStyle = "white";
-                ctx.font = "bold 20px Arial";
+                ctx.font = "bold 14px Arial";
+                ctx.fillText(document.getElementById('user-display').innerText, 55, 37);
+
+                // 3. Draw Mention Sticker (Clean Style)
                 const sticker = document.getElementById('drag-sticker');
-                const rect = document.getElementById('capture-area').getBoundingClientRect();
+                const boxRect = document.getElementById('capture-area').getBoundingClientRect();
                 const sRect = sticker.getBoundingClientRect();
+                const x = sRect.left - boxRect.left;
+                const y = sRect.top - boxRect.top;
+
+                // Simple Transparent Pill
+                ctx.fillStyle = "rgba(255,255,255,0.2)";
+                ctx.beginPath();
+                ctx.roundRect(x, y, sRect.width, sRect.height, 20);
+                ctx.fill();
+
+                ctx.fillStyle = "white";
+                ctx.font = "bold 22px Arial";
+                ctx.fillText("@" + document.getElementById('mention-display').innerText, x + 12, y + 30);
                 
-                // Draw Sticker
-                ctx.fillRect(sRect.left - rect.left, sRect.top - rect.top, sRect.width, sRect.height);
-                ctx.fillStyle = "#d62976";
-                ctx.fillText("@" + document.getElementById('mention-display').innerText, (sRect.left - rect.left) + 10, (sRect.top - rect.top) + 25);
-                
-                if(recorder.state === 'recording') requestAnimationFrame(draw);
+                if(recorder.state === 'recording') requestAnimationFrame(drawLoop);
             };
 
             recorder.start();
-            draw();
-            status.innerText = "Recording...";
+            drawLoop();
+            status.innerText = "Recording Video...";
             setTimeout(() => recorder.stop(), 5000);
         }
 
-        // Drag Logic (Same as before)
+        // Drag Logic
         const sticker = document.getElementById('drag-sticker');
         const box = document.getElementById('capture-area');
         const move = (e) => {
+            e.preventDefault();
             let cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
             let cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
             let r = box.getBoundingClientRect();
-            sticker.style.left = (cx - r.left - 50) + 'px';
-            sticker.style.top = (cy - r.top - 20) + 'px';
+            sticker.style.left = (cx - r.left - (sticker.offsetWidth/2)) + 'px';
+            sticker.style.top = (cy - r.top - (sticker.offsetHeight/2)) + 'px';
         };
-        sticker.addEventListener('touchstart', () => document.addEventListener('touchmove', move, {passive:false}));
-        document.addEventListener('touchend', () => document.removeEventListener('touchmove', move));
+        sticker.addEventListener('touchstart', (e) => {
+            document.addEventListener('touchmove', move, {passive:false});
+        });
+        document.addEventListener('touchend', () => {
+            document.removeEventListener('touchmove', move);
+        });
     </script>
 </body>
 </html>
